@@ -1,7 +1,7 @@
 # gatk4-DataPreProcessing-nf
-Nextflow pipeline for pre-process BAM(s) with hg38 and GATK4, following GATK [Best Practices](https://software.broadinstitute.org/gatk/best-practices/workflow?id=11145) (left-hand side panel).
+Nextflow pipeline for pre-process BAM(s) with hg38 and GATK4, following GATK [Best Practices](https://software.broadinstitute.org/gatk/best-practices/workflow?id=11145).
 
-<center><img src="https://us.v-cdn.net/5019796/uploads/editor/3o/dznasg7toiq1.png" width="200" /></center>
+<div style="text-align:center"><img src="https://us.v-cdn.net/5019796/uploads/editor/3o/dznasg7toiq1.png" width="200" /></div>
 
 
 ## Description
