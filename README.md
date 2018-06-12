@@ -23,7 +23,7 @@ Tailored to fit the need of re-analyzing BAM files under new GATK4 Best Practice
 - `--ref_fasta` : your reference in FASTA. 
 - `--dbsnp` : dbSNP VCF file. 
 - `--onekg` : 1000 Genomes High Confidence SNV VCF file. 
-- `--mills_` : Mills and 1000 Genomes Gold Standard SID VCF file. 
+- `--mills` : Mills and 1000 Genomes Gold Standard SID VCF file. 
 - `--gatk_jar` : the full path to your GATK4 jar file.
 
 A nextflow.config is also included, please modify it for suitability outside our pre-configured clusters ([see Nexflow configuration](https://www.nextflow.io/docs/latest/config.html#configuration-file)).
