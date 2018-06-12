@@ -37,12 +37,12 @@ if (params.help)
     log.info "nextflow run iarcbioinfo/gatk4-DataPreProcessing-nf [OPTIONS]"
     log.info ""
     log.info "Mandatory arguments:"
-    log.info "--file                   BAM FILE              BAM file (between quotes for BAMs)"
+    log.info "--input                   BAM FILE              BAM file (between quotes for BAMs)"
     log.info "--output_dir             OUTPUT FOLDER         Output for gVCF file"
-    log.info "--genome_fasta           FASTA FILE            Reference FASTA file"
+    log.info "--ref_fasta              FASTA FILE            Reference FASTA file"
     log.info "--dbsnp                  VCF FILE              dbSNP VCF file"
-    log.info "--1kg_snv                VCF FILE              1000 Genomes High Confidence SNV VCF file"
-    log.info "--mills_1kg_sid          VCF FILE              Mills and 1000 Genomes Gold Standard SID VCF file"
+    log.info "--onekg                  VCF FILE              1000 Genomes High Confidence SNV VCF file"
+    log.info "--mills                  VCF FILE              Mills and 1000 Genomes Gold Standard SID VCF file"
     log.info "--gatk_jar               JAR PATH              Full path to GATK4 binary"
     exit 1
 }
@@ -51,27 +51,27 @@ if (params.help)
 //
 // Parameters Init
 //
-params.file          = null
-params.output_dir    = "."
-params.gatk_jar      = null
-params.genome_fasta  = null
-params.dbsnp         = null
-params.1kg_snv       = null
-params.mills_1kg_sid = null
+params.input      = null
+params.output_dir = "."
+params.gatk_jar   = null
+params.ref_fasta  = null
+params.dbsnp      = null
+params.onekg      = null
+params.mills      = null
 
 
 //
 // Parse Input Parameters
 //
 ubam_ch   = Channel
-			.fromPath(params.file)
-			.map { file -> tuple(file.baseName, file) }
+			.fromPath(params.input)
+			.map { input -> tuple(file.baseName, input) }
 output    = file(params.output_dir)
 GATK      = params.gatk_jar
-ref       = file(params.genome_fasta)
+ref       = file(params.ref_fasta)
 ref_dbsnp = file(params.dbsnp)
-ref_1kg   = file(params.1kg_snv)
-ref_mills = file(params.mills_1kg_sid)
+ref_1kg   = file(params.onekg)
+ref_mills = file(params.mills)
 ref_dict  = ref.parent / ref.baseName + ".dict"
 ref_in    = ref.parent / ref.baseName + ".fasta.fai"
 ref_amb   = ref.parent / ref.baseName + ".fasta.amb"
@@ -183,7 +183,7 @@ process GATK_BaseRecalibrator_ApplyBQSR{
   memory '32 GB'
   time '4h'
     
-  publishDir "$output/$sampleID"
+  publishDir "$output/$sampleID", mode: 'copy'
   
   input: 
       file genome from ref 
