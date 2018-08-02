@@ -26,12 +26,13 @@ Tailored to fit the need of re-analyzing BAM files under new GATK4 Best Practice
 - `--dbsnp` : dbSNP VCF file. 
 - `--onekg` : 1000 Genomes High Confidence SNV VCF file. 
 - `--mills` : Mills and 1000 Genomes Gold Standard SID VCF file. 
-- `--gatk_jar` : the full path to your GATK4 jar file.
+- `--gatk_exec` : the full path to your GATK4 binary file.
+- `--interval_list` : a file for the intervals to call on. [More information on interval_list format](https://gatkforums.broadinstitute.org/gatk/discussion/1319/collected-faqs-about-interval-lists).
 
 A nextflow.config is also included, please modify it for suitability outside our pre-configured clusters ([see Nexflow configuration](https://www.nextflow.io/docs/latest/config.html#configuration-file)).
 
 ## Usage for Cobalt cluster
 ```
-nextflow run iarcbioinfo/gatk4-DataPreProcessing.nf -profile cobalt --input "/data/test_*.bam" --output_dir /data/myRecalBAMs --ref_fasta /ref/Homo_sapiens_assembly38.fasta --gatk_jar /bin/gatk-4.0.4.0/gatk-package-4.0.4.0-local.jar --dbsnp /ref/dbsnp_146.hg38.vcf.gz --onekg /ref/1000G_phase1.snps.high_confidence.hg38.vcf.gz --mills Mills_and_1000G_gold_standard.indels.hg38.vcf.gz
+nextflow run iarcbioinfo/gatk4-DataPreProcessing.nf -profile cobalt --input "/data/test_*.bam" --output_dir /data/myRecalBAMs --ref_fasta /ref/Homo_sapiens_assembly38.fasta --gatk_exec /bin/gatk-4.0.6.0/gatk --dbsnp /ref/dbsnp_146.hg38.vcf.gz --onekg /ref/1000G_phase1.snps.high_confidence.hg38.vcf.gz --mills Mills_and_1000G_gold_standard.indels.hg38.vcf.gz --interval_list Exome.interval_list
 ```
 

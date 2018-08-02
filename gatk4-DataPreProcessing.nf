@@ -37,13 +37,14 @@ if (params.help)
     log.info "nextflow run iarcbioinfo/gatk4-DataPreProcessing-nf [OPTIONS]"
     log.info ""
     log.info "Mandatory arguments:"
-    log.info "--input                   BAM FILE              BAM file (between quotes for BAMs)"
+    log.info "--input                  BAM FILE              BAM file (between quotes for BAMs)"
     log.info "--output_dir             OUTPUT FOLDER         Output for gVCF file"
     log.info "--ref_fasta              FASTA FILE            Reference FASTA file"
     log.info "--dbsnp                  VCF FILE              dbSNP VCF file"
     log.info "--onekg                  VCF FILE              1000 Genomes High Confidence SNV VCF file"
     log.info "--mills                  VCF FILE              Mills and 1000 Genomes Gold Standard SID VCF file"
-    log.info "--gatk_jar               JAR PATH              Full path to GATK4 binary"
+    log.info "--gatk_exec              BIN PATH              Full path to GATK4 executable"
+    log.info "--interval_list          INTERVAL_LIST FILE    Interval.list file"
     exit 1
 }
 
@@ -51,13 +52,14 @@ if (params.help)
 //
 // Parameters Init
 //
-params.input      = null
-params.output_dir = "."
-params.gatk_jar   = null
-params.ref_fasta  = null
-params.dbsnp      = null
-params.onekg      = null
-params.mills      = null
+params.input         = null
+params.output_dir    = "."
+params.gatk_exec     = null
+params.ref_fasta     = null
+params.dbsnp         = null
+params.onekg         = null
+params.mills         = null
+params.interval_list = null
 
 
 //
@@ -65,10 +67,11 @@ params.mills      = null
 //
 ubam_ch   = Channel
 			.fromPath(params.input)
-			.map { input -> tuple(file.baseName, input) }
+			.map { input -> tuple(input.baseName, input) }
 output    = file(params.output_dir)
-GATK      = params.gatk_jar
+GATK      = params.gatk_exec
 ref       = file(params.ref_fasta)
+interList = file(params.interval_list)
 ref_dbsnp = file(params.dbsnp)
 ref_1kg   = file(params.onekg)
 ref_mills = file(params.mills)
@@ -81,28 +84,59 @@ ref_pac   = ref.parent / ref.baseName + ".fasta.pac"
 ref_sa    = ref.parent / ref.baseName + ".fasta.sa"
 
 
+
+//
+// Process FixMate
+//
+process PICARD_FixMate{
+  tag "$sampleID"
+
+  cpus 2
+  memory '16 GB'
+  time '2h'
+
+  input: 
+      set sampleID, file(ubam) from ubam_ch
+
+  output: 
+      set sampleID, file("${sampleID}.fix.bam"), file("${sampleID}.fix.bai") into fix_bam_ch
+
+	script:
+	"""
+    java -Xmx4G -XX:ParallelGCThreads=2 -XX:-UseGCOverheadLimit -Djava.io.tmpdir=$TMPnf/$sampleID -jar \${PICARD_TOOLS_LIBDIR}/picard.jar \
+		FixMateInformation \
+        ASSUME_SORTED=true \
+        CREATE_INDEX=true \
+		I=${ubam} \
+		O=${sampleID}.fix.bam
+	
+	"""
+}
+
 //
 // Process uBAM to FASTQ
 //
 process PICARD_SamToFastq{
   tag "$sampleID"
 
-  cpus 8
-  memory '16 GB'
+  cpus 2
   time '2h'
     
+  memory { 40.GB + (8 * task.attempt) }
+  errorStrategy 'retry' 
+
   input: 
-      set sampleID, file(ubam) from ubam_ch
+      set sampleID, file(bam), file(bai) from fix_bam_ch
 
   output: 
       set sampleID, file("${sampleID}_1.fastq"), file("${sampleID}_2.fastq") into fastq_ch
 
 	script:
 	"""
-	java -Xmx4g -XX:ParallelGCThreads=8 -jar \$PICARD_TOOLS_LIBDIR/picard.jar \
+	java -Xmx24g -XX:ParallelGCThreads=2 -XX:CICompilerCount=2 -XX:-UseGCOverheadLimit -Djava.io.tmpdir=$TMPnf/$sampleID -jar \$PICARD_TOOLS_LIBDIR/picard.jar \
 		SamToFastq \
 		VALIDATION_STRINGENCY=LENIENT \
-		I=${ubam} \
+		I=${bam} \
 		F=${sampleID}_1.fastq \
 		F2=${sampleID}_2.fastq
 	
@@ -117,7 +151,7 @@ process BWA_mapping{
   tag "$sampleID"
 
   cpus 8
-  memory '64 GB'
+  memory '72 GB'
   time '12h'
   
   input: 
@@ -137,9 +171,9 @@ process BWA_mapping{
   script:    
   """
 	bwa mem -t 8 -R '@RG\\tID:${sampleID}\\tSM:${sampleID}\\tPL:Illumina' $genome $fastq1 $fastq2 | \
-		k8 \$BWAKIT_EXEDIR/bwa-postalt.js \$POSTALT_REF | \
+		k8 \$BWAKIT_EXEDIR/bwa-postalt.js $POSTALT_REF | \
 		sambamba view -t 8 -S -f bam -l 0 /dev/stdin | \
-		sambamba sort -t 8 -m 6G --tmpdir=/tmp /dev/stdin -o ${sampleID}.aln.bam		
+		sambamba sort -t 8 -m 6G --tmpdir=$TMPnf/$sampleID /dev/stdin -o ${sampleID}.aln.bam		
 	
   """
 
@@ -166,7 +200,7 @@ process SAMBAMBA_markdup{
 
   script:    
   """
-	sambamba markdup -t 8 --tmpdir=/tmp $bam ${sampleID}.aln.dup.bam
+	sambamba markdup -t 8 --tmpdir=$TMPnf/$sampleID $bam ${sampleID}.aln.dup.bam
 	
   """
 
@@ -196,17 +230,18 @@ process GATK_BaseRecalibrator_ApplyBQSR{
 
   script:    
   """
-	java -XX:ParallelGCThreads=1 -Xmx4G -Djava.io.tmpdir=/tmp -jar ${GATK} \
+    ${GATK} --java-options "-Xmx4g -Xms4g -Djava.io.tmpdir=$TMPnf/$sampleID" \
     		BaseRecalibrator \
     		-R ${genome} \
     		-I ${bam} \
             --use-original-qualities \
             -O ${sampleID}.recal_data.table \
+            -L ${interList} \
             -known-sites ${ref_dbsnp} \
             -known-sites ${ref_1kg} \
             -known-sites ${ref_mills}
 			
-	java -XX:ParallelGCThreads=1 -Xmx4G -Djava.io.tmpdir=/tmp -jar ${GATK} \
+    ${GATK} --java-options "-Xmx4g -Xms4g -Djava.io.tmpdir=$TMPnf/$sampleID" \
     		ApplyBQSR \
     		-R ${genome} \
     		-I ${bam} \
@@ -239,10 +274,13 @@ process QUALIMAP_BamQC{
 
   script:    
   """
-	qualimap bamqc \
+    grep -v "^@" ${interList} | cut -f-3,5 > tmp.bed
+
+    qualimap bamqc \
 		--java-mem-size=24G \
 		-c \
 		-nt 8 \
+        --feature-file tmp.bed \
 		-bam $bam
 
   """
