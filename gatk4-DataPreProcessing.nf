@@ -274,7 +274,7 @@ process QUALIMAP_BamQC{
 
   script:    
   """
-    grep -v "^@" ${interList} | cut -f-3,5 > tmp.bed
+    grep -v "^@" ${interList} | cut -f-3,5 | awk 'BEGIN{OFS="\t"}{print \$1,\$2,\$3,\$4,0,"."}' > tmp.bed
 
     qualimap bamqc \
 		--java-mem-size=24G \
