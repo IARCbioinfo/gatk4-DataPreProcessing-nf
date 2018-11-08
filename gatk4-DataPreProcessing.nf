@@ -75,8 +75,7 @@ interList = file(params.interval_list)
 ref_dbsnp = file(params.dbsnp)
 ref_1kg   = file(params.onekg)
 ref_mills = file(params.mills)
-ref_dict  = ref.parent / ref.baseName + ".dict"
-ref_in    = ref.parent / ref.baseName + ".fasta.fai"
+ref_alt   = ref.parent / ref.baseName + ".fasta.alt"
 ref_amb   = ref.parent / ref.baseName + ".fasta.amb"
 ref_ann   = ref.parent / ref.baseName + ".fasta.ann"
 ref_bwt   = ref.parent / ref.baseName + ".fasta.bwt"
@@ -122,8 +121,9 @@ process PICARD_SamToFastq{
   cpus 2
   time '2h'
     
-  memory { 40.GB + (8 * task.attempt) }
-  errorStrategy 'retry' 
+  memory { (40.GB + (8.GB * task.attempt)) }
+  errorStrategy 'retry'
+  maxRetries 3
 
   input: 
       set sampleID, file(bam), file(bai) from fix_bam_ch
@@ -156,8 +156,7 @@ process BWA_mapping{
   
   input: 
       file genome from ref
-      file "${genome.baseName}.dict" from ref_dict
-      file "${genome.baseName}.fasta.fai" from ref_in
+      file "${genome.baseName}.fasta.alt" from ref_alt
       file "${genome.baseName}.fasta.amb" from ref_amb
       file "${genome.baseName}.fasta.ann" from ref_ann
       file "${genome.baseName}.fasta.bwt" from ref_bwt
@@ -171,7 +170,7 @@ process BWA_mapping{
   script:    
   """
 	bwa mem -t 8 -R '@RG\\tID:${sampleID}\\tSM:${sampleID}\\tPL:Illumina' $genome $fastq1 $fastq2 | \
-		k8 \$BWAKIT_EXEDIR/bwa-postalt.js $POSTALT_REF | \
+		k8 \$BWAKIT_EXEDIR/bwa-postalt.js ${genome.baseName}.fasta.alt | \
 		sambamba view -t 8 -S -f bam -l 0 /dev/stdin | \
 		sambamba sort -t 8 -m 6G --tmpdir=$TMPnf/$sampleID /dev/stdin -o ${sampleID}.aln.bam		
 	
@@ -221,8 +220,6 @@ process GATK_BaseRecalibrator_ApplyBQSR{
   
   input: 
       file genome from ref 
-      file "${genome.baseName}.dict" from ref_dict
-      file "${genome.baseName}.fasta.fai" from ref_in
       set sampleID, file(bam), file(index) from dup_bam_ch
 
   output: 
@@ -230,6 +227,13 @@ process GATK_BaseRecalibrator_ApplyBQSR{
 
   script:    
   """
+    java -jar \$PICARD_TOOLS_LIBDIR/picard.jar \
+    CreateSequenceDictionary \
+    R=${genome} \
+    O=${genome.baseName}.dict
+
+    samtools faidx ${genome}
+    
     ${GATK} --java-options "-Xmx4g -Xms4g -Djava.io.tmpdir=$TMPnf/$sampleID" \
     		BaseRecalibrator \
     		-R ${genome} \
@@ -286,8 +290,5 @@ process QUALIMAP_BamQC{
   """
 
 }
-
-
-
 
 

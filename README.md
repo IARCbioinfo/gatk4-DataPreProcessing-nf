@@ -13,10 +13,12 @@ Tailored to fit the need of re-analyzing BAM files under new GATK4 Best Practice
 1. This pipeline is based on [nextflow](https://www.nextflow.io). As we have several nextflow pipelines, we have centralized the common information in the [IARC-nf](https://github.com/IARCbioinfo/IARC-nf) repository. Please read it carefully as it contains essential information for the installation, basic usage and configuration of nextflow and our pipelines.
 2. [GATK4 executables](https://software.broadinstitute.org/gatk/download/)
 3. [Picard tools](https://broadinstitute.github.io/picard/)
-4. [BWA](https://github.com/lh3/bwa/tree/master/bwakit), especially BWAKIT, because a post-alignment treatment is required ([more info](https://github.com/lh3/bwa/blob/master/bwakit/bwa-postalt.js)).
+4. [BWA](https://github.com/lh3/bwa/tree/master/bwakit), especially BWAKIT, because a post-alignment treatment is required ([more info](https://github.com/lh3/bwa/blob/master/README-alt.md)).
 5. [Sambamba](http://lomereiter.github.io/sambamba/).
 6. [Qualimap](http://qualimap.bioinfo.cipf.es/) binary in your PATH (for a nice QC per BAM).
 7. References (genome in fasta, dbSNP vcf, 1000 Genomes vcf, Mills and 1000 Genomes Gold Standard vcf), available in [GATK Bundle](https://software.broadinstitute.org/gatk/download/bundle).
+
+**IMPORTANT note about post-alignment** : according to this [post](https://software.broadinstitute.org/gatk/documentation/article.php?id=8017), BWA has an implicit *alt-aware* mode. In order to have the expected behavior of `postalt.js` step, one must make sure to have within the FASTA reference folder, the `<name_of_ref>.fasta.alt` as well. 
 
 ## Input
 
