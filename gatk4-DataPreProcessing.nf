@@ -92,7 +92,7 @@ process PICARD_FixMate{
 
   cpus 2
   memory '16 GB'
-  time '2h'
+  time '6h'
 
   input: 
       set sampleID, file(ubam) from ubam_ch
@@ -119,9 +119,9 @@ process PICARD_SamToFastq{
   tag "$sampleID"
 
   cpus 2
-  time '2h'
-    
-  memory { (40.GB + (8.GB * task.attempt)) }
+  time { (3.hour + (2.hour * task.attempt)) } // First attempt 5h, second 7h, etc
+  memory { (40.GB + (8.GB * task.attempt)) } // First attempt 48GB, second 56GB, etc
+
   errorStrategy 'retry'
   maxRetries 3
 
@@ -188,8 +188,6 @@ process SAMBAMBA_markdup{
   cpus 8
   memory '64 GB'
   time '12h'
-  
-  module 'sambamba/0.6.5'
   
   input: 
 	  set sampleID, file(bam), file(bai) from aln_bam_ch
@@ -266,7 +264,7 @@ process QUALIMAP_BamQC{
 
   cpus 8
   memory '32 GB'
-  time '4h'
+  time '6h'
       
   publishDir "$output/$sampleID", mode: 'copy'
   
@@ -274,10 +272,12 @@ process QUALIMAP_BamQC{
 	  set sampleID, file(bam), file(bai) from recal_bam_ch
 
   output: 
-      set sampleID, file("${sampleID}.recal_stats") into recal_bam_stats_ch
+      set sampleID, file("${sampleID}.recal_stats"), file("${sampleID}.stats.txt") into recal_bam_stats_ch
 
   script:    
   """
+    samtools flagstat $bam > ${sampleID}.stats.txt
+    
     grep -v "^@" ${interList} | cut -f-3,5 | awk 'BEGIN{OFS="\t"}{print \$1,\$2,\$3,\$4,0,"."}' > tmp.bed
 
     qualimap bamqc \
@@ -290,5 +290,8 @@ process QUALIMAP_BamQC{
   """
 
 }
+
+
+
 
 
